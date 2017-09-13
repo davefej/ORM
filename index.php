@@ -4,7 +4,7 @@ require_once __DIR__.'/model/import_model.php';
 model_base_require();
 
 
-echo "<h1>Creating new user and persist</h1>";
+echo "<h1>Creating new empty user and persist</h1>";
 echo "<br/>";
 
 
@@ -19,7 +19,7 @@ echo "<h1>Updating user and persist</h1>";
 echo "<br/>";
 
 sleep(1);
-$user->set("username","First");
+$user->set("username","Username".strval(rand(100,100000)));
 $user->set("password","password");
 $user->set("created",new DateTime());
 $user->update();

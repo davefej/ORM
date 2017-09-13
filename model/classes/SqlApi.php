@@ -5,7 +5,7 @@ class SqlApi implements IPersistenceApi{
 	private $servername = "localhost:3306";
 	private $username = "root";
 	private $password = "";
-	private $dbname = "focatipp";
+	private $dbname = "orm";
 	
 	private function connect(){
 		
