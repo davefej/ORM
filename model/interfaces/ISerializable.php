@@ -10,7 +10,7 @@ interface ISerializable{
 
 	public static function name();
 
-	public function seriaize();
+	public function serialize();
 
 	public function get($attr);
 

@@ -1,18 +1,18 @@
 <?php
 class User extends MySerializable{
 	
-	
-	public function __construct(){		
-		$this->attributes = array(
-				"id" => 0,
-				"username" => "",
-				"password" => "",				
-				"ip" => "",
-				"email" => "",
-				"created" => (new DateTime()),
-				"deleted" => false
+	public function definition(){		
+		return array(
+				"id" => DataTypes::INT,
+				"username" => DataTypes::STRING,
+				"password" => DataTypes::STRING,
+				"ip" => DataTypes::STRING,
+				"email" => DataTypes::STRING,
+				"created" => DataTypes::DATE,
+				"father" => User::dataType(),
+				"deleted" => DataTypes::BOOL
 		);		
-	}
+	}	
 	
 	public static function name(){
 		return "user";

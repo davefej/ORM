@@ -7,6 +7,7 @@ class SqlApi implements IPersistenceApi{
 	private $password = "";
 	private $dbname = "orm";
 	
+	
 	private function connect(){
 		
 		// Create connection
@@ -29,12 +30,12 @@ class SqlApi implements IPersistenceApi{
 		$conn->close();
 	}
 	
-	public function insert($serializable) {		
+	public function insert(MySerializable $serializable) {
 		$attributes_str = "( id,";
 		$values_str = "( NULL,";
 		$bind_types_str = "";
 		$array_of_params = array();
-		$data = $serializable->seriaize();
+		$data = $serializable->serialize();
 		
 		$array_of_params[] = &$bind_types_str;
 		
@@ -42,7 +43,7 @@ class SqlApi implements IPersistenceApi{
 		foreach($data as $attribute => $value){
 			$attributes_str .= $coma.$attribute;
 			$values_str .= $coma."?";
-			$bind_types_str .= $this->formatType(gettype($value));
+			$bind_types_str .= $this->formatType($serializable,$attribute);
 			$coma = ",";
 		}
 		
@@ -82,15 +83,16 @@ class SqlApi implements IPersistenceApi{
 		$serializable->setId($id);
 		$stmt->close();
 		$conn->close();
+		$serializable = $this->register($serializable);
 		return true;
 		
 	}
 
-	public function update($serializable) {
+	public function update(MySerializable $serializable) {
 		$update_str = " ";
 		$bind_types_str = "";
 		$array_of_params = array();
-		$data = $serializable->seriaize();
+		$data = $serializable->serialize();
 		$changes_keys = $serializable->changed();
 		
 		$array_of_params[] = &$bind_types_str;		
@@ -100,7 +102,7 @@ class SqlApi implements IPersistenceApi{
 				continue;
 			}
 			$update_str .= $coma.$attribute."=?";
-			$bind_types_str .= $this->formatType(gettype($value));
+			$bind_types_str .= $this->formatType($serializable,$attribute);
 			$coma = ",";
 		}
 		
@@ -136,7 +138,7 @@ class SqlApi implements IPersistenceApi{
 		return true;
 	}
 
-	public function select($serializableclass,$sqlfilter) {
+	public function select($serializableclassname,$sqlfilter) {		
 		
 		$bind_types_str = "";
 		$array_of_params = array();
@@ -144,7 +146,7 @@ class SqlApi implements IPersistenceApi{
 		
 		$filter_values = $sqlfilter->values();
 		foreach($filter_values as $value){
-			$bind_types_str .= $this->formatType(gettype($value));
+			$bind_types_str .= $this->formatType2(gettype($value));
 		}
 		
 		$keys = array_keys($filter_values);
@@ -152,7 +154,7 @@ class SqlApi implements IPersistenceApi{
 			$array_of_params[] = & $filter_values[$keys[$i]];
 		}
 		
-		$SQL = "SELECT * FROM ".$serializableclass::name()." WHERE ".$sqlfilter->generate();		
+		$SQL = "SELECT * FROM ".$serializableclassname::name()." WHERE ".$sqlfilter->generate();		
 		$conn = $this->connect();
 		$stmt = $conn->prepare($SQL);
 		call_user_func_array(array($stmt, 'bind_param'), $array_of_params);
@@ -183,17 +185,18 @@ class SqlApi implements IPersistenceApi{
 		
 		$obj_array = array();
 		foreach($result as $curr_row){
-			$class = new ReflectionClass($serializableclass);
+			$class = new ReflectionClass($serializableclassname);
 			$args  = array();
 			$serial_obj = $class->newInstanceArgs($args);
 			
-			$serial_obj->build($curr_row);
+			$serial_obj = $serial_obj->build($curr_row);
+			$serial_obj = $this->register($serial_obj);
 			array_push($obj_array, $serial_obj);
 		}
 		return $obj_array;
 	}
 
-	public function delete($serializable) {		
+	public function delete(MySerializable $serializable) {		
 		$SQL = "UPDATE ".$serializable->name()." SET deleted=1 WHERE id=?";
 		$conn = $this->connect();
 		$stmt = $conn->prepare($SQL);
@@ -231,11 +234,33 @@ class SqlApi implements IPersistenceApi{
 		return true;
 	}
 	
-	private function formatType($type){
+	private function formatType(MySerializable $serializable, $attribute){
+		$type = $serializable->definition()[$attribute];
+		switch ($type){
+			case DataTypes::STRING:
+				return "s";
+			case DataTypes::INT:
+				return "i";
+			case DataTypes::DATE:
+				return "i";
+			case DataTypes::BOOL:
+				return "i";
+			default:
+				if(is_subclass_of($type,MySerializable::class)){
+					return "i";
+				}else{
+					throw new Exception('Not implemented');
+				}		
+		}
+	}
+	
+	private function formatType2($type){
 		switch ($type){
 			case "string":
 				return "s";
 			case "integer":
+				return "i";
+			case "NULL":
 				return "i";
 			default:
 				throw new Exception('Unimplemented format type');
@@ -256,61 +281,22 @@ class SqlApi implements IPersistenceApi{
 	{
 	
 	}
+	
+	private function register(MySerializable $obj){
+		$o = ObjectRegistry::getInstance();
+		return $o->register($obj);
+	}
+	
+	private function inRegistry($class, $id){
+		return ObjectRegistry::getInstance()->inRegistry($class, $id);		
+	}
+	
+	private function getFromRegistry($class, $id){
+		return ObjectRegistry::getInstance()->getFromRegistry($class, $id);
+	}
 
 }
 
-class SqlFilter{
-	
-	private $filter_str = "";
-	private $orderby = "";
-	private $values = array();
-	
-	public function reset(){
-		$this->filter_str = "";
-		$this->values = array();
-	}
-	
-	public function addand($attribute,$operator,$value){
-		if($this->filter_str != ""){
-			$this->filter_str .= " AND ";
-		}
-		$this->filter_str .= $attribute.=" ".$operator." ?";
-		array_push($this->values, $value);
-	}
-	
-	public function addor($attribute,$operator,$value){
-		if($this->filter_str != ""){
-			$this->filter_str .= " OR ";
-		}
-		$this->filter_str .= $attribute.=" ".$operator." ?";
-		array_push($this->values, $value);
-	}
-	
-	public function generate(){
-		if($this->filter_str == ""){
-			return " 1=? ".$this->orderby;
-		}else{
-			return $this->filter_str.$this->orderby;
-		}
-		
-	}
-	
-	public function values(){
-		if($this->filter_str == ""){
-			return array(1);
-		}else{
-			return $this->values;
-		}
-		
-	}
-	
-	public function orderby($str){
-		$this->orderby = " ORDER BY ".$str." ";
-	}
-	
-	public function reverseorderby($str){
-		$this->orderby = " ORDER BY ".$str." DESC ";
-	}
-}
+
 
 ?>
