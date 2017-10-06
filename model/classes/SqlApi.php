@@ -31,6 +31,7 @@ class SqlApi implements IPersistenceApi{
 	}
 	
 	public function insert(MySerializable $serializable) {
+		$this->manyRelationSave($serializable);
 		$attributes_str = "( id,";
 		$values_str = "( NULL,";
 		$bind_types_str = "";
@@ -65,8 +66,6 @@ class SqlApi implements IPersistenceApi{
 		$values_str = $values_str.")";
 		$SQL = "INSERT INTO ".$serializable->name()." ".$attributes_str." VALUES ".$values_str;
 		
-		
-		
 		$conn = $this->connect();
 		$stmt = $conn->prepare($SQL);
 		if(!$stmt){
@@ -89,6 +88,7 @@ class SqlApi implements IPersistenceApi{
 	}
 
 	public function update(MySerializable $serializable) {
+		$this->manyRelationSave($serializable);
 		$update_str = " ";
 		$bind_types_str = "";
 		$array_of_params = array();
@@ -294,6 +294,176 @@ class SqlApi implements IPersistenceApi{
 	private function getFromRegistry($class, $id){
 		return ObjectRegistry::getInstance()->getFromRegistry($class, $id);
 	}
+	
+	private function manyRelationSave(MySerializable $obj){
+		if($obj->hasManyRelation()){
+			$definition = $obj->definition();
+			foreach($definition as $attr => $value){
+				if(is_array($value)){
+					$newRelationArray = $this->objectToIdList($obj->get($attr));
+					$oldRelationArray = $this->objectToIdList($obj->getOriginalMultiRelations($attr));
+					$deletedRelationArray = $this->relationArrayDiff($oldRelationArray, $newRelationArray);
+					foreach($deletedRelationArray as $item){
+						$relation = new Relation();
+						$relation->setRelationName($attr);
+						$relation->set("owner",$obj->id());
+						if(gettype($item) == "integer"){
+							$relation->set("property",$item);
+						}else if(is_subclass_of($item,MySerializable::class)){
+							$relation->set("property", $item->id());
+						}else{
+							throw new Exception('Not implemented');
+						}
+						$this->deleteRelation($relation);
+					}
+					foreach ($newRelationArray as $item){
+						if(!$this->relationInArray($item,$oldRelationArray)){
+							$relation = new Relation();
+							$relation->setRelationName($attr);
+							$relation->set("owner",$obj->id());
+							if(gettype($item) == "integer"){
+								$relation->set("property",$item);
+							}else if(is_subclass_of($item,MySerializable::class)){
+								$relation->set("property", $item->id());
+							}else{
+								throw new Exception('Not implemented');
+							}
+							$this->insertRelation($relation);
+						}					
+					}
+				}
+			}			
+		}else{
+			return true;
+		}
+	}
+	
+	private function compareRelation(Relation $rel1,Relation $rel2){
+		return $rel1->get("owner") === $rel2->get("owner") && $rel1->get("property") === $rel2->get("property");
+	}
+	
+	private function relationInArray($value, $array){
+		$arr = $this->objectToIdList($array);
+		foreach ($arr as $item){
+			if(is_subclass_of($value,MySerializable::class)){
+				if($item == $value->id()){
+					return true;
+				}
+			}else if(gettype($value) === "integer"){
+				if($item == $value){
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
+	private function objectToIdList($array){
+		$ret = array();
+		foreach ($array as $value){
+			if(is_subclass_of($value,MySerializable::class)){
+				array_push($ret, $value->id());
+			}else if(gettype($value) === "integer"){
+				array_push($ret, $value);
+			}
+		}
+		return $ret;
+	}
+	
+	private function relationArrayDiff($array1, $array2){
+		$ret = array();
+		foreach ($array1 as $item1){
+			$match = false;
+			foreach ($array2 as $item2){
+				if($item1 === $item2){
+					$match = true;
+				}
+			}
+			if(!$match){
+				array_push($ret, $item1);
+			}
+		}
+		return $ret;
+	}
+	
+	private function insertRelation(Relation $rel){
+		$conn = $this->connect();
+		$stmt = $conn->prepare("INSERT INTO ".$rel->getRelationName()." (owner, property) VALUES (?, ?)");
+		if(!$stmt){
+			$conn->close();
+			return false;
+		}
+		$stmt->bind_param("ii", $rel->get("owner"),$rel->get("property"));		
+		if(!$stmt->execute()){
+			$stmt->close();
+			$conn->close();
+			return false;
+		}		
+		$stmt->close();
+		$conn->close();	
+		return true;
+	}
+	
+	private function deleteRelation(Relation $rel){
+		$conn = $this->connect();
+		$stmt = $conn->prepare("DELETE FROM ".$rel->getRelationName()." WHERE owner = ? AND property = ?");
+		if(!$stmt){
+			$conn->close();
+			return false;
+		}
+		$stmt->bind_param("ii", $rel->get("owner"),$rel->get("property"));
+		if(!$stmt->execute()){
+			$stmt->close();
+			$conn->close();
+			return false;
+		}
+		$stmt->close();
+		$conn->close();
+		return true;
+	}
+	
+	public function loadRelations($id,$attr,$classtype){
+		$ret = array();
+		$conn = $this->connect();
+		$stmt = $conn->prepare("SELECT property FROM ".$attr." WHERE owner = ?");
+		if(!$stmt){
+			$conn->close();
+			return null;
+		}
+		$properties = array();
+		$stmt->bind_param("i", $id);
+		if($stmt->execute()){
+			$result = $stmt->get_result();
+			while ($row = $result->fetch_assoc()) {
+				array_push($properties, $row['property']);
+			}			
+			$stmt->free_result();
+			$stmt->close();	
+			$conn->close();
+			
+			foreach($properties as $propertyid){
+				if(ObjectRegistry::getInstance()->inRegistry($classtype, $propertyid)){
+					array_push($ret, ObjectRegistry::getInstance()->getFromRegistry($classtype, $propertyid));
+				}else{
+					$filter = new SqlFilter();
+					$filter->addand("id","=",$propertyid);
+					$classname = $classtype;
+					$res_obj = $classname::selectOne($filter);
+					if($res_obj != null){
+						array_push($ret,$res_obj);
+					}else{
+						$this->invalidDatafield();
+					}
+				}
+			}									
+			return $ret;
+		}else{
+			$stmt->close();
+			$conn->close();
+			return null;
+		}		
+	}
+	
 
 }
 

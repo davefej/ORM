@@ -45,6 +45,7 @@ class ObjectRegistry{
 		foreach($this->objectsRegistry as $classname => $list){
 			foreach ($list as $id => $obj){
 				echo $obj->toJson();
+				echo "<br/>";
 			}
 		}
 	}

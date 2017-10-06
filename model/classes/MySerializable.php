@@ -9,6 +9,8 @@ abstract class MySerializable implements ISerializable{
 	protected $changed = array();
 	
 	protected $default_deleted = true;
+	
+	protected $originalMultiRelations = array();
 		
 	//return name of class
 	abstract public static function name();
@@ -32,7 +34,15 @@ abstract class MySerializable implements ISerializable{
 				case $value === DataTypes::DATE :{
 					$this->attributes[$key] = new DateTime();
 					break;
-				}	
+				}
+				case is_array($value):
+					$tip = $value[0];
+					if(is_subclass_of($tip,MySerializable::class)){
+						$this->attributes[$key] = array();
+					}else{
+						throw new Exception('Not implemented');
+					}					
+					break;				
 				default:{
 					if(is_subclass_of($value,MySerializable::class)){
 						$this->attributes[$key] = null;
@@ -46,12 +56,11 @@ abstract class MySerializable implements ISerializable{
 	}
 
 	public function serialize(){
-		$ret =  $this->attributes;
+		$ret =  array();
 		$def = $this->definition();
-		unset($ret["id"]);
-		unset($ret["deleted"]);		
-		foreach($ret as $key => $value){
-			$type = $def[$key];
+		
+		foreach($def as $key => $type){
+			$value = $this->attributes[$key];
 			switch (true){
 				case $type === DataTypes::STRING:
 					$ret[$key] = $value;
@@ -65,8 +74,23 @@ abstract class MySerializable implements ISerializable{
 				case $type === DataTypes::DATE:
 					$ret[$key] = $value->format("Y-m-d H:i:s");
 					break;
+				case is_array($type):
+					continue;
+					/*
+					$retval = array();
+					foreach ($value as $item){
+						if(gettype($item) == "integer"){
+							array_push($retval, $item);
+						}else if(is_subclass_of($item,MySerializable::class)){
+							array_push($retval, $item->id());
+						}else{
+							throw new Exception('Not implemented');
+						}
+					}
+					*/
+					break;
 				default:
-					if(is_subclass_of($def[$key],MySerializable::class)){
+					if(is_subclass_of($type,MySerializable::class)){
 						if($value === null){
 							$ret[$key] = 0;
 						}else{
@@ -79,6 +103,8 @@ abstract class MySerializable implements ISerializable{
 			}						
 			
 		}
+		unset($ret["id"]);
+		unset($ret["deleted"]);
 		
 		return $ret;
 	}
@@ -95,19 +121,143 @@ abstract class MySerializable implements ISerializable{
 	}
 
 	public function set($attr,$value){
+		if(array_key_exists($attr, $this->attributes)){			
+			$def = $this->definition();
+			$def[$attr];
+		
+			switch(true){
+				case $def[$attr] === DataTypes::BOOL && gettype($value) === "boolean" :{
+					$this->attributes[$attr] = $value;
+					array_push($this->changed, $attr);
+					break;
+				}
+				case $def[$attr] === DataTypes::STRING && gettype($value) === "string" :{
+					$this->attributes[$attr] = $value;
+					array_push($this->changed, $attr);
+					break;
+				}
+				case $def[$attr] === DataTypes::INT && gettype($value) === "integer" :{
+					$this->attributes[$attr] = $value;
+					array_push($this->changed, $attr);
+					break;
+				}
+				case $def[$attr] === DataTypes::DATE && (is_a($value,'DateTime')) :{
+					$this->attributes[$attr] = $value;
+					array_push($this->changed, $attr);
+					break;
+				}
+				case is_array($def[$attr]):
+					$tip = $value[0];
+					if(is_subclass_of($tip,MySerializable::class)){
+						$this->attributes[$attr] = $value;
+						array_push($this->changed, $attr);
+					}else{
+						throw new Exception('Data Format Exception');
+					}
+					break;
+				default:{
+					if(is_subclass_of($def[$attr],MySerializable::class)){
+						$this->attributes[$attr] = $value;
+						array_push($this->changed, $attr);
+					}else{
+						throw new Exception('Data Format Exception');
+					}
+					break;
+				}
+			}
+		}else{
+			throw new Exception('No Attribute '.$attr. 'in Serializable');
+		}
+/*			
 		if(array_key_exists($attr, $this->attributes)){
 			$this->attributes[$attr] = $value;
 			array_push($this->changed, $attr);
 		}else{
 			throw new Exception('No Attribute '.$attr. 'in Serializable');
 		}
+*/
+	}
+	
+	public function add($attr,$value){
+		$def = $this->definition();
+		if(is_array($def[$attr])){			
+			if($this->attributes[$attr] === null){
+				$this->attributes[$attr] = array($value);
+			}else{
+				array_push($this->attributes[$attr], $value);
+			}
+			return true;
+		}else{
+			return false;
+		}
+	}
+	
+	public function removeAll($attr,$value){
+		$def = $this->definition();
+		if(is_array($def[$attr])){		
+			$this->attributes[$attr] = array();			
+			return true;
+		}else{
+			return false;
+		}
+	}
+	
+	public function remove($attr,$value){
+		
+		if(gettype($value) == "integer"){
+			$id = $value;
+		}else if($value->dataType() == $this->dataType()){
+			$id = $value->id();
+		}else{
+			return false;
+		}
+		$def = $this->definition();
+		if(is_array($def[$attr])){			
+			if($this->attributes[$attr] == null){
+				return false;
+			}	
+			foreach($this->attributes[$attr] as $pos => $item){
+				if(gettype($item) == "integer"){
+					if($id === $item){
+						unset($this->attributes[$attr],$pos);
+						break;
+					}
+				}else if($item->dataType() == $this->dataType()){
+					if($id === $item->id()){
+						unset($this->attributes[$attr],$pos);
+						break;
+					}
+				}
+			}			
+			return true;
+		}else{
+			return false;
+		}
 	}
 	
 	public function toJson(){
-		$ret =  $this->attributes;		
-		foreach($ret as $key => $value){
-			if($value instanceof DateTime){
+		$ret =  array();
+		$def = $this->definition();
+		foreach($def as $key => $type){
+			$value = $this->attributes[$key];
+			if($value == null){
+				$ret[$key] = $value;
+			}else if( $type === DataTypes::DATE){
 				$ret[$key] = $value->format("Y-m-d H:i:s");
+			}else if(is_subclass_of($type,MySerializable::class)){
+				$ret[$key] = array("id" => $value->id());
+			}else if(is_array($type)){
+				$idlist = array();
+				foreach($value as $item){					
+					if(gettype($item) == "integer"){
+						array_push($idlist, array("id" => $item));
+					}else if($item->dataType() == $this->dataType()){
+						array_push($idlist, array("id" => $item->id()));
+					}
+				}
+				$ret[$key] = $idlist;
+			}else{
+				$ret[$key] = $value;
 			}
 		}
 		return json_encode($ret);
@@ -120,16 +270,14 @@ abstract class MySerializable implements ISerializable{
 			$json = $json_str;
 		}
 		
-		//TODO *....1 *...* kapcsolat
-		
-		
 		if(ObjectRegistry::getInstance()->inRegistry($this->dataType(), $json["id"])){
 			return ObjectRegistry::getInstance()->getFromRegistry(get_called_class(), $json["id"]);
 		}
 		
 		$types = $this->definition();
-		foreach ($this->attributes as $key => $value){
+		foreach ($this->definition() as $key => $value){		
 			if(array_key_exists($key, $json)){
+				$value = $json[$key];
 				switch(true){
 					case $types[$key] === DataTypes::STRING:
 						if(gettype($value) == "string"){
@@ -162,13 +310,51 @@ abstract class MySerializable implements ISerializable{
 							$this->invalidDatafield();
 						}
 						break;
+					case is_array($types[$key]):
+						$type = $types[$key][0];
+						if(is_subclass_of($type,MySerializable::class)){
+							if($value == null){
+								$this->attributes[$key] = $this->loadManyRelations($json["id"],$key,$type);
+								$this->setOriginalMultiRelations($key,$this->attributes[$key]);
+							}else if(is_array($value)){
+								$arr = array();
+								foreach ($value as $item) {
+									if(gettype($item) == "integer"){
+										//Object id not object
+										if(ObjectRegistry::getInstance()->inRegistry($type, $item)){
+											array_push($arr,ObjectRegistry::getInstance()->getFromRegistry($type, $item));
+										}else{
+											$filter = new SqlFilter();
+											$filter->addand("id","=",$item);
+											$classname = $type;
+											$res_obj = $classname::selectOne($filter);											
+											if($res_obj != null){
+												array_push($arr,$res_obj);
+											}else{
+												$this->invalidDatafield();
+											}
+										}
+									}else if($item->dataType() == $this->dataType()){
+										array_push($arr, $item);
+									}									
+								}
+								$this->attributes[$key] = $arr;
+								$this->setOriginalMultiRelations($key,$arr);
+							}else{
+								$this->invalidDatafield();
+							}
+						}else{
+							$this->invalidDatafield();
+						}						
+						break;
 					default:
 						if(is_subclass_of($types[$key],MySerializable::class)){
 							if($value == null){
 								//DO NOTHING object reference not set yet
 							}else if(gettype($value) == "integer"){
-								if(ObjectRegistry::getInstance()->inRegistry($value->dataType(), $value->id())){
-									$this->attributes[$key] = ObjectRegistry::getInstance()->getFromRegistry($value->dataType(), $value->id());
+								//Object id not object
+								if(ObjectRegistry::getInstance()->inRegistry($types[$key], $value)){
+									$this->attributes[$key] = ObjectRegistry::getInstance()->getFromRegistry($types[$key], $value);
 								}else{
 									$filter = new SqlFilter();
 									$filter->addand("id","=",$value);
@@ -178,7 +364,7 @@ abstract class MySerializable implements ISerializable{
 									}else{
 										$this->invalidDatafield();
 									}
-								}
+								}							
 							}else if($this->dataType() == $value->dataType()){
 								$this->attributes[$key] = $value;
 							}else{
@@ -190,7 +376,15 @@ abstract class MySerializable implements ISerializable{
 						}
 						break;
 				}				
-			}		
+			}else{				
+				if(is_array($types[$key])){//manyRelations
+					$type = $types[$key][0];
+					if(is_subclass_of($type,MySerializable::class)){
+						$this->attributes[$key] = $this->loadManyRelations($json["id"],$key,$type);
+						$this->setOriginalMultiRelations($key,$this->attributes[$key]);
+					}
+				}					
+			}
 		}
 		return $this;
 	}
@@ -261,6 +455,10 @@ abstract class MySerializable implements ISerializable{
 		}		
 	}
 	
+	public function loadManyRelations($id,$attr,$type){	
+		return SqlApi::getInstance()->loadRelations($id,$attr,$type);		
+	}
+	
 	public function changed(){
 		return $this->changed;
 	}
@@ -272,7 +470,7 @@ abstract class MySerializable implements ISerializable{
 	private function validateDateTime($dateStr)
 	{
 		if($dateStr === "0000-00-00 00:00:00"){
-			return DateTime::createFromFormat('Y-m-d H:i:s', "0000-00-00 00:00:00");
+			return true;//DateTime::createFromFormat('Y-m-d H:i:s', "0000-00-00 00:00:00");
 		}
 		date_default_timezone_set('UTC');
 		$date = DateTime::createFromFormat('Y-m-d H:i:s', $dateStr);
@@ -284,7 +482,30 @@ abstract class MySerializable implements ISerializable{
 	}
 	
 	public function arrayType(){
-		return " ".$this->dataType();
+		return array($this->dataType());
+	}
+	
+	public function hasManyRelation(){
+		$definition = $this->definition();
+		foreach($definition as $key => $value){
+			if(is_array($value)){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public function setOriginalMultiRelations($attr,$value){
+		$this->originalMultiRelations[$attr] = $value;
+	}
+	
+	public function getOriginalMultiRelations($attr){
+		if(array_key_exists($attr,$this->originalMultiRelations)){
+			return $this->originalMultiRelations[$attr];
+		}else{
+			return array();
+		}
+		
 	}
 	
 }

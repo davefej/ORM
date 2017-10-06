@@ -10,6 +10,7 @@ class User extends MySerializable{
 				"email" => DataTypes::STRING,
 				"created" => DataTypes::DATE,
 				"father" => User::dataType(),
+				"children" => User::arrayType(),
 				"deleted" => DataTypes::BOOL
 		);		
 	}	

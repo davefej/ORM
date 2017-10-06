@@ -52,6 +52,7 @@ $filter = new SqlFilter();
 $filter->addand("id","=",$id2);
 $user6 = User::selectOne($filter);
 $user2->set("father",$user6);
+$user2->add("children",$user6);
 $user2->save();
 
 
