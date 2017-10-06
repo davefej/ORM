@@ -1,5 +1,5 @@
 <?php
-class SqlFilter{
+class SqlFilter implements IFilter{
 
 	private $filter_str = "";
 	private $orderby = "";

@@ -13,6 +13,7 @@ function model_base_require(){
 	require __DIR__.'/classes/ObjectRegistry.php';
 	require_model('Relation.php');
 	require_model('User.php');
+	require_model('Eye.php');
 	
 }
 

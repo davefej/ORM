@@ -13,15 +13,12 @@ class SqlApi implements IPersistenceApi{
 		// Create connection
 		$conn = new mysqli($this->servername, $this->username, $this->password, $this->dbname);
 		// Check connection
-		if ($conn->connect_error) {
-			
-			//TODO LOG CONNErROR  $conn->connect_error
-			return false;
+		if ($conn->connect_error) {			
+			throw new Exception("Can't connect to database".$conn->connect_error);
 		}
 		
 		if (!$conn->set_charset("utf8")) {
-			//TODO charset error	
-		
+			throw new Exception("Can't load carset utf-8");
 		} 
 		return $conn;
 	}
@@ -41,7 +38,8 @@ class SqlApi implements IPersistenceApi{
 		$array_of_params[] = &$bind_types_str;
 		
 		$coma = "";
-		foreach($data as $attribute => $value){
+		$attributes = array_keys($data);
+		foreach($attributes as $attribute){
 			$attributes_str .= $coma.$attribute;
 			$values_str .= $coma."?";
 			$bind_types_str .= $this->formatType($serializable,$attribute);
@@ -97,7 +95,8 @@ class SqlApi implements IPersistenceApi{
 		
 		$array_of_params[] = &$bind_types_str;		
 		$coma = "";
-		foreach($data as $attribute => $value){
+		$attributes = array_keys($data);
+		foreach($attributes as $attribute){
 			if($attribute == "id" || !in_array($attribute, $changes_keys)){
 				continue;
 			}

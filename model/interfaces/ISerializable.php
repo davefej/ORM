@@ -36,14 +36,23 @@ interface ISerializable{
 	
 	public function insert();
 
-	public static function select($filter_obj);
+	public static function select(IFilter $filter_obj);
 	
-	public static function selectOne($filter_obj);
+	public static function selectOne(IFilter $filter_obj);
 	
 	public function changed();
 	
 	public function default_deleted();
-
+	
+	public static function dataType();
+	
+	public static function arrayType();
+	
+	public function hasManyRelation();
+	
+	public function setOriginalMultiRelations($attr,$value);
+	
+	public function getOriginalMultiRelations($attr);
 }
 
 ?>

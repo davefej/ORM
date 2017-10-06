@@ -11,8 +11,9 @@ class User extends MySerializable{
 				"created" => DataTypes::DATE,
 				"father" => User::dataType(),
 				"children" => User::arrayType(),
+				"eyes" => Eye::arrayType(),
 				"deleted" => DataTypes::BOOL
-		);		
+		);
 	}	
 	
 	public static function name(){

@@ -251,7 +251,7 @@ abstract class MySerializable implements ISerializable{
 				foreach($value as $item){					
 					if(gettype($item) == "integer"){
 						array_push($idlist, array("id" => $item));
-					}else if($item->dataType() == $this->dataType()){
+					}else if(is_subclass_of($item::dataType(),MySerializable::class)){
 						array_push($idlist, array("id" => $item->id()));
 					}
 				}
@@ -269,6 +269,8 @@ abstract class MySerializable implements ISerializable{
 		}else{
 			$json = $json_str;
 		}
+		
+		//TODO amny relations from basic types (int string ...)
 		
 		if(ObjectRegistry::getInstance()->inRegistry($this->dataType(), $json["id"])){
 			return ObjectRegistry::getInstance()->getFromRegistry(get_called_class(), $json["id"]);
@@ -441,11 +443,11 @@ abstract class MySerializable implements ISerializable{
 		}
 	}
 	
-	public static function select($filter_obj){
+	public static function select(IFilter $filter_obj){
 		return SqlApi::getInstance()->select(static::name(), $filter_obj);
 	}
 	
-	public static function selectOne($filter_obj){
+	public static function selectOne(IFilter $filter_obj){
 		
 		$ret = SqlApi::getInstance()->select(static::name(), $filter_obj);
 		if(count($ret) > 0){
@@ -477,17 +479,17 @@ abstract class MySerializable implements ISerializable{
 		return $date && ($date->format('Y-m-d H:i:s') === $dateStr);
 	}
 	
-	public function dataType(){
+	public static function dataType(){
 		return get_called_class();
 	}
 	
-	public function arrayType(){
-		return array($this->dataType());
+	public static function arrayType(){
+		return array(static::dataType());
 	}
 	
 	public function hasManyRelation(){
 		$definition = $this->definition();
-		foreach($definition as $key => $value){
+		foreach($definition as $value){
 			if(is_array($value)){
 				return true;
 			}

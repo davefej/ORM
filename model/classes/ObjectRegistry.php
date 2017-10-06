@@ -42,8 +42,8 @@ class ObjectRegistry{
 	}
 	
 	public function log(){
-		foreach($this->objectsRegistry as $classname => $list){
-			foreach ($list as $id => $obj){
+		foreach($this->objectsRegistry as $list){
+			foreach ($list as $obj){
 				echo $obj->toJson();
 				echo "<br/>";
 			}
