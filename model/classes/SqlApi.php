@@ -187,9 +187,14 @@ class SqlApi implements IPersistenceApi{
 			$class = new ReflectionClass($serializableclassname);
 			$args  = array();
 			$serial_obj = $class->newInstanceArgs($args);
+			if(!array_key_exists("id",$curr_row)){
+				throw new Exception("Missing id");
+			}
+			$serial_obj->setId($curr_row['id']);
+			$serial_obj = $this->register($serial_obj);
 			
 			$serial_obj = $serial_obj->build($curr_row);
-			$serial_obj = $this->register($serial_obj);
+			
 			array_push($obj_array, $serial_obj);
 		}
 		return $obj_array;
@@ -422,6 +427,7 @@ class SqlApi implements IPersistenceApi{
 	}
 	
 	public function loadRelations($id,$attr,$classtype){
+		
 		$ret = array();
 		$conn = $this->connect();
 		$stmt = $conn->prepare("SELECT property FROM ".$attr." WHERE owner = ?");

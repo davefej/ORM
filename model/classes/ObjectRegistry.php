@@ -3,8 +3,14 @@
 class ObjectRegistry{
 	
 	private $objectsRegistry = array();	
+	private $max = 1000;
+	
 	
 	public function register(MySerializable $obj){
+		if(count($this->objectsRegistry) > $this->max){
+			throw Error("ObjectRegistry is full");
+		}
+		
 		if($this->inRegistry($obj->dataType(),$obj->id())){
 			return $this->getFromRegistry($obj->dataType(),$obj->id());
 		}

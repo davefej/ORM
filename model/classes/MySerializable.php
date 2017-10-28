@@ -271,6 +271,7 @@ abstract class MySerializable implements ISerializable{
 		}
 		
 		//TODO amny relations from basic types (int string ...)
+		//infinite loop error circle
 		
 		if(ObjectRegistry::getInstance()->inRegistry($this->dataType(), $json["id"])){
 			return ObjectRegistry::getInstance()->getFromRegistry(get_called_class(), $json["id"]);
@@ -359,8 +360,8 @@ abstract class MySerializable implements ISerializable{
 									$this->attributes[$key] = ObjectRegistry::getInstance()->getFromRegistry($types[$key], $value);
 								}else{
 									$filter = new SqlFilter();
-									$filter->addand("id","=",$value);
-									$obj = static::selectOne($filter);
+									$filter->addand("id","=",$value);									
+									$obj = $types[$key]::selectOne($filter);
 									if($obj != null){
 										$this->attributes[$key] = $obj;
 									}else{

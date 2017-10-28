@@ -3,6 +3,7 @@
 require_once __DIR__.'/model/import_model.php';
 model_base_require();
 
+
 $id = rand(10,100);
 
 $filter = new SqlFilter();
@@ -25,7 +26,6 @@ $eye2->save();
 $user->add("eyes",$eye);
 $user->add("eyes",$eye2);
 $user->save();
-
 
 ObjectRegistry::getInstance()->log();
 

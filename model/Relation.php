@@ -2,13 +2,17 @@
 class Relation extends MySerializable{
 
 	private $relationname = "";
-	
-	
-	public function definition(){
-		return array(				
+	private $definition = array(				
 			"owner" => DataTypes::INT,
 			"property" => DataTypes::INT
 		);
+	
+	public function definition(){
+		return $this->definition;
+	}
+	
+	public function setDefinition($defarray){
+		$this->definition = $defarray;
 	}
 
 	public static function name(){
