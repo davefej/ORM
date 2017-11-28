@@ -40,7 +40,13 @@ abstract class MySerializable implements ISerializable{
 					if(is_subclass_of($tip,MySerializable::class)){
 						$this->attributes[$key] = array();
 					}else{
-						throw new Exception('Not implemented');
+						$this->invalidDatafield();
+						/*
+						if($this->isArrayType($tip)){
+							$this->attributes[$key] = array();
+						}else{
+							throw new Exception('Not implemented');
+						}*/					
 					}					
 					break;				
 				default:{
@@ -168,14 +174,7 @@ abstract class MySerializable implements ISerializable{
 		}else{
 			throw new Exception('No Attribute '.$attr. 'in Serializable');
 		}
-/*			
-		if(array_key_exists($attr, $this->attributes)){
-			$this->attributes[$attr] = $value;
-			array_push($this->changed, $attr);
-		}else{
-			throw new Exception('No Attribute '.$attr. 'in Serializable');
-		}
-*/
+
 	}
 	
 	public function add($attr,$value){
@@ -270,9 +269,8 @@ abstract class MySerializable implements ISerializable{
 			$json = $json_str;
 		}
 		
-		//TODO amny relations from basic types (int string ...)
-		//infinite loop error circle
-		
+		//TODO many relations from basic types (int string ...)
+				
 		if(ObjectRegistry::getInstance()->inRegistry($this->dataType(), $json["id"])){
 			return ObjectRegistry::getInstance()->getFromRegistry(get_called_class(), $json["id"]);
 		}
@@ -347,7 +345,15 @@ abstract class MySerializable implements ISerializable{
 								$this->invalidDatafield();
 							}
 						}else{
-							$this->invalidDatafield();
+							if($this->isArrayType($type)){
+								$this->invalidDatafield();
+								
+								//TODO MANY RELATION FOR BASIC TYPE
+								
+							}else{
+								$this->invalidDatafield();
+							}
+							
 						}						
 						break;
 					default:
@@ -508,6 +514,17 @@ abstract class MySerializable implements ISerializable{
 		}else{
 			return array();
 		}
+		
+	}
+	
+	public function isArrayType($tip){
+		if( $tip === DataTypes::BOOL
+			|| $tip === DataTypes::STRING 
+			||$tip === DataTypes::INT 
+			|| $tip === DataTypes::DATE){
+			return true;
+		}
+		return false;
 		
 	}
 	

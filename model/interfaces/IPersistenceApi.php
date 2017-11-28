@@ -10,14 +10,23 @@ interface IPersistenceApi{
 	
 }
 
-abstract class DataTypes
-{
+abstract class DataTypes{
+	
 	const STRING = 0;
 	const DATE = 1;
 	const INT = 2;
 	const BOOL = 3;
-	
 
 }
+
+abstract class ArrayTypes{
+
+	const STRING = array(DataTypes::STRING);
+	const DATE = array(DataTypes::DATE);
+	const INT = array(DataTypes::INT);
+	const BOOL = array(DataTypes::BOOL);
+
+}
+
 
 ?>
