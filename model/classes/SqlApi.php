@@ -22,11 +22,7 @@ class SqlApi implements IPersistenceApi{
 		} 
 		return $conn;
 	}
-	
-	private function close($conn){		
-		$conn->close();
-	}
-	
+
 	public function insert(MySerializable $serializable) {
 		$this->manyRelationSave($serializable);
 		$attributes_str = "( id,";
@@ -137,7 +133,7 @@ class SqlApi implements IPersistenceApi{
 		return true;
 	}
 
-	public function select($serializableclassname,$sqlfilter) {		
+	public function select($serializableclassname,SqlFilter $sqlfilter) {		
 		
 		$bind_types_str = "";
 		$array_of_params = array();
@@ -180,7 +176,7 @@ class SqlApi implements IPersistenceApi{
 			$result[] = $c;
 		}
 		$stmt->close();
-		$this->close($conn);
+		$conn->close();
 		
 		$obj_array = array();
 		foreach($result as $curr_row){
@@ -219,7 +215,7 @@ class SqlApi implements IPersistenceApi{
 		return true;
 	}
 	
-	public function restore($serializable) {		
+	public function restore(MySerializable $serializable) {		
 		$SQL = "UPDATE ".$serializable->name()." SET deleted=0 WHERE id=?";
 		$conn = $this->connect();
 		$stmt = $conn->prepare($SQL);

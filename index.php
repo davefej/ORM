@@ -3,11 +3,12 @@
 require_once __DIR__.'/model/import_model.php';
 model_base_require();
 
-
-$id = rand(10,100);
+$tibike = new User();
+$tibike->set("username","Tibike");
+$tibike->save();
 
 $filter = new SqlFilter();
-$filter->addand("id","=",$id);
+$filter->addand("username","=","Tibike");
 $user = User::selectOne($filter);
 
 $eye = new Eye();

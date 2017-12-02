@@ -55,4 +55,8 @@ class ObjectRegistry{
 			}
 		}
 	}
+	
+	protected function __construct(){
+		
+	}
 }

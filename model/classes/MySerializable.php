@@ -132,9 +132,16 @@ abstract class MySerializable implements ISerializable{
 			$def[$attr];
 		
 			switch(true){
-				case $def[$attr] === DataTypes::BOOL && gettype($value) === "boolean" :{
-					$this->attributes[$attr] = $value;
-					array_push($this->changed, $attr);
+				case $def[$attr] === DataTypes::BOOL :{
+					if(gettype($value) === "boolean"){
+						$this->attributes[$attr] = $value;
+						array_push($this->changed, $attr);
+					}else if(gettype($value) === "integer"){
+						$this->attributes[$attr] = boolval($value);
+						array_push($this->changed, $attr);
+					}else{
+						$this->invalidDatafield();
+					}					
 					break;
 				}
 				case $def[$attr] === DataTypes::STRING && gettype($value) === "string" :{
@@ -158,7 +165,7 @@ abstract class MySerializable implements ISerializable{
 						$this->attributes[$attr] = $value;
 						array_push($this->changed, $attr);
 					}else{
-						throw new Exception('Data Format Exception');
+						$this->invalidDatafield();
 					}
 					break;
 				default:{
@@ -166,7 +173,7 @@ abstract class MySerializable implements ISerializable{
 						$this->attributes[$attr] = $value;
 						array_push($this->changed, $attr);
 					}else{
-						throw new Exception('Data Format Exception');
+						$this->invalidDatafield();
 					}
 					break;
 				}
@@ -191,7 +198,7 @@ abstract class MySerializable implements ISerializable{
 		}
 	}
 	
-	public function removeAll($attr,$value){
+	public function removeAll($attr){
 		$def = $this->definition();
 		if(is_array($def[$attr])){		
 			$this->attributes[$attr] = array();			
@@ -280,37 +287,10 @@ abstract class MySerializable implements ISerializable{
 			if(array_key_exists($key, $json)){
 				$value = $json[$key];
 				switch(true){
-					case $types[$key] === DataTypes::STRING:
-						if(gettype($value) == "string"){
-							$this->attributes[$key] = $json[$key];
-						}else{
-							$this->invalidDatafield();
-						}
+					case DataTypes::normal($types[$key]):{
+						$this->set($key,$json[$key]);
 						break;
-					case $types[$key] === DataTypes::BOOL:
-						if($json[$key] === "0" || $json[$key] === false || $json[$key] === 0){
-							$this->attributes[$key] = false;
-						}else if($json[$key] === "1" || $json[$key] === true || $json[$key] === 1){
-							$this->attributes[$key] = true;
-						}else{
-							$this->invalidDatafield();
-						}
-						break;
-					case $types[$key] === DataTypes::INT:
-						if(gettype($value) == "integer"){
-							$this->attributes[$key] = $json[$key];
-						}else{
-							$this->invalidDatafield();
-						}
-						
-						break;
-					case $types[$key] === DataTypes::DATE:
-						if($this->validateDateTime($json[$key])){
-							$this->attributes[$key] = new DateTime($json[$key]);
-						}else{
-							$this->invalidDatafield();
-						}
-						break;
+					}					
 					case is_array($types[$key]):
 						$type = $types[$key][0];
 						if(is_subclass_of($type,MySerializable::class)){
@@ -346,14 +326,11 @@ abstract class MySerializable implements ISerializable{
 							}
 						}else{
 							if($this->isArrayType($type)){
-								$this->invalidDatafield();
-								
-								//TODO MANY RELATION FOR BASIC TYPE
-								
+								$this->invalidDatafield();								
+								//TODO MANY RELATION FOR BASIC TYPE								
 							}else{
 								$this->invalidDatafield();
-							}
-							
+							}							
 						}						
 						break;
 					default:
@@ -363,19 +340,19 @@ abstract class MySerializable implements ISerializable{
 							}else if(gettype($value) == "integer"){
 								//Object id not object
 								if(ObjectRegistry::getInstance()->inRegistry($types[$key], $value)){
-									$this->attributes[$key] = ObjectRegistry::getInstance()->getFromRegistry($types[$key], $value);
+									$this->set($key,ObjectRegistry::getInstance()->getFromRegistry($types[$key], $value));
 								}else{
 									$filter = new SqlFilter();
 									$filter->addand("id","=",$value);									
 									$obj = $types[$key]::selectOne($filter);
 									if($obj != null){
-										$this->attributes[$key] = $obj;
+										$this->set($key,$obj);
 									}else{
 										$this->invalidDatafield();
 									}
 								}							
 							}else if($this->dataType() == $value->dataType()){
-								$this->attributes[$key] = $value;
+								$this->set($key,$value);								
 							}else{
 								$this->invalidDatafield();
 							}
